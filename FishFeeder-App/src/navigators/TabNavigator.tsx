@@ -3,8 +3,10 @@ import React from 'react';
 import {StyleSheet} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {BlurView} from '@react-native-community/blur';
-import Octicons from 'react-native-vector-icons/Octicons';
+import MIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Home from '../screens/Home';
+import History from '../screens/History';
+import Schedule from '../screens/Schedule';
 
 
 const Tab = createBottomTabNavigator();
@@ -30,20 +32,33 @@ const TabNavigator = () => {
         component={Home}
         options={{
           tabBarIcon: ({focused, color, size}) => (
-            <Octicons name="home" size={size} color={
-              focused ? '#D1F4FF' : '#2F2F2F'
+            <MIcons name="home-outline" size={size} color={
+              focused ? '#D1F4FF' : '#4D4D4D'
             }
             />
           ),
         }}
         />
-         <Tab.Screen
-        name="GPACalculator"
-        component={Home}
+        <Tab.Screen
+        name="Schedule"
+        component={Schedule}
         options={{
           tabBarIcon: ({focused, color, size}) => (
-            <Octicons name="meter" size={size} color={
-              focused ? '#D1F4FF' : '#2F2F2F'
+            <MIcons name="calendar-clock" size={size} color={
+              focused ? '#D1F4FF' : '#4D4D4D'
+            }
+            />
+          ),
+        }}
+        />
+
+         <Tab.Screen
+        name="History"
+        component={History}
+        options={{
+          tabBarIcon: ({focused, color, size}) => (
+            <MIcons name="history" size={size} color={
+              focused ? '#D1F4FF' : '#4D4D4D'
             }
             />
           ),
