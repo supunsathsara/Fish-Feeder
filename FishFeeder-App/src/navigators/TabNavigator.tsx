@@ -8,7 +8,6 @@ import Home from '../screens/Home';
 import History from '../screens/History';
 import Schedule from '../screens/Schedule';
 
-
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
@@ -32,40 +31,41 @@ const TabNavigator = () => {
         component={Home}
         options={{
           tabBarIcon: ({focused, color, size}) => (
-            <MIcons name="home-outline" size={size} color={
-              focused ? '#D1F4FF' : '#4D4D4D'
-            }
+            <MIcons
+              name="home-outline"
+              size={size}
+              color={focused ? '#D1F4FF' : '#4D4D4D'}
             />
           ),
         }}
-        />
-        <Tab.Screen
+      />
+      <Tab.Screen
         name="Schedule"
         component={Schedule}
         options={{
           tabBarIcon: ({focused, color, size}) => (
-            <MIcons name="calendar-clock" size={size} color={
-              focused ? '#D1F4FF' : '#4D4D4D'
-            }
+            <MIcons
+              name="calendar-clock"
+              size={size}
+              color={focused ? '#D1F4FF' : '#4D4D4D'}
             />
           ),
         }}
-        />
+      />
 
-         <Tab.Screen
+      <Tab.Screen
         name="History"
         component={History}
         options={{
           tabBarIcon: ({focused, color, size}) => (
-            <MIcons name="history" size={size} color={
-              focused ? '#D1F4FF' : '#4D4D4D'
-            }
+            <MIcons
+              name="history"
+              size={size}
+              color={focused ? '#D1F4FF' : '#4D4D4D'}
             />
           ),
         }}
-        />
-       
-     
+      />
     </Tab.Navigator>
   );
 };

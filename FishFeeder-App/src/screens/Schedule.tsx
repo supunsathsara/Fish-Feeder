@@ -1,82 +1,144 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Switch, Button, useTheme, FAB } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons'; 
+import React, {useState} from 'react';
+import {StyleSheet, View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {
+  Card,
+  Text,
+  Switch,
+  Button,
+  useTheme,
+  FAB,
+  IconButton,
+  MD3Colors,
+} from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const Schedule = () => {
-  const [isEnabled, setIsEnabled] = useState(true);
-  const [activeDays, setActiveDays] = useState(['Mon', 'Wed', 'Fri']); // Example active days
+const Schedule = ({navigation}: any) => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const toggleSwitch = () => setIsEnabled(previousState => !previousState);
-  const toggleDay = (day:any) => {
-    if (activeDays.includes(day)) {
-      setActiveDays(activeDays.filter(d => d !== day));
-    } else {
-      setActiveDays([...activeDays, day]);
-    }
+  const sampleSchedules = [
+    {
+      id: 1,
+      time: 'At 2.30 P.M.',
+      qty: 50,
+      activeDays: ['Mon', 'Wed', 'Fri'],
+      enabled: true,
+    },
+    {
+      id: 2,
+      time: 'At 4.00 P.M.',
+      qty: 10,
+      activeDays: ['Tue', 'Thu', 'Sat'],
+      enabled: true,
+    },
+    // Add more sample schedules as needed
+  ];
+
+  const [schedules, setSchedules] = useState(sampleSchedules);
+
+  const toggleSwitch = (id: any) => {
+    setSchedules(
+      schedules.map(schedule => {
+        if (schedule.id === id) {
+          return {...schedule, enabled: !schedule.enabled};
+        }
+        return schedule;
+      }),
+    );
+  };
+
+  const deleteSchedule = (id: any) => {
+    setSchedules(schedules.filter(schedule => schedule.id !== id));
+  };
+
+  const toggleDay = (day: any, scheduleId: any) => {
+    setSchedules(
+      schedules.map(schedule => {
+        if (schedule.id === scheduleId) {
+          if (schedule.activeDays.includes(day)) {
+            return {
+              ...schedule,
+              activeDays: schedule.activeDays.filter(d => d !== day),
+            };
+          } else {
+            return {...schedule, activeDays: [...schedule.activeDays, day]};
+          }
+        }
+        return schedule;
+      }),
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Card style={styles.card}>
-        <Card.Title
-          title="Current Schedule"
-          left={(props) => <Icon {...props} name="schedule" size={24} color="#fff" />}
-          right={() => <Switch value={isEnabled} onValueChange={toggleSwitch} color="#6200ee" />}
-        />
-        <Card.Content style={{ opacity: isEnabled ? 1 : 0.5 }}>
-          <View style={styles.daysContainer}>
-            {days.slice(0, 4).map((day) => (
-              <Button
-                key={day}
-                onPress={() => toggleDay(day)}
-                style={[
-                  styles.dayButton,
-                  { backgroundColor: activeDays.includes(day) ? '#6200ee' : '#333' }
-                ]}
-              >
-                <Text style={styles.dayText}>{day}</Text>
-              </Button>
-            ))}
-          </View>
-          <View style={styles.daysContainer}>
-            {days.slice(4).map((day) => (
-              <Button
-                key={day}
-                mode="contained"
-                onPress={() => toggleDay(day)}
-                style={[
-                  styles.dayButton,
-                  { backgroundColor: activeDays.includes(day) ? '#6200ee' : '#333' }
-                ]}
-              >
-                <Text style={styles.dayText}>{day}</Text>
-              </Button>
-            ))}
-          </View>
-          <Text style={styles.text}>At 2.30 P.M.</Text>
-        </Card.Content>
-      </Card>
+      {schedules.map(schedule => (
+        <Card
+          key={schedule.id}
+          style={[styles.card, {opacity: schedule.enabled ? 1 : 0.5}]}>
+          <Card.Title
+            title={schedule.time + ' - ' + schedule.qty + ' QTY'}
+            left={props => (
+              <Icon {...props} name="schedule" size={24} color="#fff" />
+            )}
+            right={() => (
+              <>
+                <Switch
+                  value={schedule.enabled}
+                  onValueChange={() => toggleSwitch(schedule.id)}
+                  color="#6200ee"
+                />
+                <IconButton
+                  icon="trash-can-outline"
+                  iconColor={MD3Colors.error50}
+                  size={30}
+                  style={{alignSelf: 'flex-end'}}
+                  onPress={() => deleteSchedule(schedule.id)}
+                />
+              </>
+            )}
+          />
+          <Card.Content>
+            <View style={styles.daysContainer}>
+              {days.map(day => (
+                <Button
+                  key={day}
+                  onPress={() => toggleDay(day, schedule.id)}
+                  style={[
+                    styles.dayButton,
+                    {
+                      backgroundColor: schedule.activeDays.includes(day)
+                        ? '#6200ee'
+                        : '#333',
+                    },
+                  ]}>
+                  <Text style={styles.dayText}>{day}</Text>
+                </Button>
+              ))}
+            </View>
+          </Card.Content>
+        </Card>
+      ))}
 
       <FAB
-        style={styles.fab}   
-        icon="pencil"
+        style={styles.fab}
+        icon="plus"
         color="#fff"
-        onPress={() => console.log('Add new schedule')}
-        />
+        onPress={() => navigation.navigate('newSchedule')}
+      />
     </SafeAreaView>
   );
 };
 
 export default Schedule;
 
+// ... rest of the code
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
     backgroundColor: '#000',
+    paddingTop: 20,
   },
   card: {
     width: '90%',
@@ -100,17 +162,20 @@ const styles = StyleSheet.create({
     height: 59,
     justifyContent: 'center',
     marginHorizontal: 4, // Added for spacing between buttons
+    //add a white border line around the button
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   dayText: {
     color: '#fff',
     fontSize: 12,
     lineHeight: 16, // Adjust line height to vertically center the text inside the button
   },
-    fab: {
-        position: 'absolute',
-        margin: 16,
-        right: 0,
-        bottom: 55,
-        backgroundColor: '#6200ee',
-    },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 55,
+    backgroundColor: '#6200ee',
+  },
 });

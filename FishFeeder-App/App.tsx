@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './src/navigators/TabNavigator';
 import { StyleSheet } from 'react-native';
+import NewSchedule from './src/screens/NewSchedule';
 
 const Stack = createNativeStackNavigator();
 
@@ -13,6 +14,10 @@ const App = () => {
         <Stack.Screen
           name="Tab"
           component={TabNavigator}
+          options={{animation: 'slide_from_bottom'}}></Stack.Screen>
+          <Stack.Screen
+          name='newSchedule'
+          component={NewSchedule}
           options={{animation: 'slide_from_bottom'}}></Stack.Screen>
        
       </Stack.Navigator>
