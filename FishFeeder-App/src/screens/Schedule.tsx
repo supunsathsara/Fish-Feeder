@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -10,120 +10,189 @@ import {
   FAB,
   IconButton,
   MD3Colors,
+  ActivityIndicator,
 } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import axios from 'axios';
+
+interface Schedule {
+  id: string;
+  time: {
+    dayOfWeek: number[];
+    hour: number;
+    minute: number;
+  };
+  quantity: string;
+  active: boolean;
+}
 
 const Schedule = ({navigation}: any) => {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+  type Day = (typeof days)[number];
 
-  const sampleSchedules = [
-    {
-      id: 1,
-      time: 'At 2.30 P.M.',
-      qty: 50,
-      activeDays: ['Mon', 'Wed', 'Fri'],
-      enabled: true,
-    },
-    {
-      id: 2,
-      time: 'At 4.00 P.M.',
-      qty: 10,
-      activeDays: ['Tue', 'Thu', 'Sat'],
-      enabled: true,
-    },
-    // Add more sample schedules as needed
-  ];
-
-  const [schedules, setSchedules] = useState(sampleSchedules);
-
-  const toggleSwitch = (id: any) => {
-    setSchedules(
-      schedules.map(schedule => {
-        if (schedule.id === id) {
-          return {...schedule, enabled: !schedule.enabled};
-        }
-        return schedule;
-      }),
-    );
+  const isoWeekdays: {[key in Day]: number} = {
+    Sun: 7,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
   };
 
-  const deleteSchedule = (id: any) => {
-    setSchedules(schedules.filter(schedule => schedule.id !== id));
+  const [loading, setLoading] = useState<boolean>(true); // Initialize loading state as true
+
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  const fetchSchedules = async () => {
+    try {
+      const response = await axios.get('http://10.0.2.2:3000/schedules');
+      setSchedules(response.data);
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleDay = (day: any, scheduleId: any) => {
-    setSchedules(
-      schedules.map(schedule => {
-        if (schedule.id === scheduleId) {
-          if (schedule.activeDays.includes(day)) {
-            return {
-              ...schedule,
-              activeDays: schedule.activeDays.filter(d => d !== day),
-            };
-          } else {
-            return {...schedule, activeDays: [...schedule.activeDays, day]};
+  const toggleSwitch = async (id: string) => {
+    try {
+      setSchedules(prevSchedules =>
+        prevSchedules.map(schedule => {
+          if (schedule.id === id) {
+            return {...schedule, active: !schedule.active};
           }
-        }
-        return schedule;
-      }),
-    );
+          return schedule;
+        }),
+      );
+
+      // Send PUT request to update schedule status
+      await axios.put(`http://10.0.2.2:3000/schedules/${id}/status`, {
+        active: !schedules.find(schedule => schedule.id === id)?.active,
+      });
+    } catch (error) {
+      console.error('Error toggling switch:', error);
+      //if error, revert the changes
+      setSchedules(prevSchedules =>
+        prevSchedules.map(schedule => {
+          if (schedule.id === id) {
+            return {...schedule, active: !schedule.active};
+          }
+          return schedule;
+        }),
+      );
+    }
+  };
+
+  const deleteSchedule = async (id: any) => {
+    let backupSchedules: Schedule[] = [];
+    try {
+      // Backup current schedules in case of rollback
+      backupSchedules = [...schedules];
+
+      // Delete schedule locally first
+      setSchedules(schedules.filter(schedule => schedule.id !== id));
+
+      // Then, send a request to delete schedule from backend
+      await axios.delete(`http://10.0.2.2:3000/schedules/${id}`);
+
+      // Handle success response if needed
+      console.log(`Schedule deleted successfully for ID: ${id}`);
+    } catch (error) {
+      // Check if error is an AxiosError
+      if (axios.isAxiosError(error)) {
+        // Handle AxiosError
+        console.error('Axios error:', error.message);
+      } else {
+        // Handle other types of errors
+        console.error('Error:', error);
+      }
+
+      // Revert the changes by restoring backup schedules
+      setSchedules(backupSchedules);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {schedules.map(schedule => (
-        <Card
-          key={schedule.id}
-          style={[styles.card, {opacity: schedule.enabled ? 1 : 0.5}]}>
-          <Card.Title
-            title={schedule.time + ' - ' + schedule.qty + ' QTY'}
-            left={props => (
-              <Icon {...props} name="schedule" size={24} color="#fff" />
-            )}
-            right={() => (
-              <>
-                <Switch
-                  value={schedule.enabled}
-                  onValueChange={() => toggleSwitch(schedule.id)}
-                  color="#6200ee"
-                />
-                <IconButton
-                  icon="trash-can-outline"
-                  iconColor={MD3Colors.error50}
-                  size={30}
-                  style={{alignSelf: 'flex-end'}}
-                  onPress={() => deleteSchedule(schedule.id)}
-                />
-              </>
-            )}
-          />
-          <Card.Content>
-            <View style={styles.daysContainer}>
-              {days.map(day => (
-                <Button
-                  key={day}
-                  onPress={() => toggleDay(day, schedule.id)}
-                  style={[
-                    styles.dayButton,
-                    {
-                      backgroundColor: schedule.activeDays.includes(day)
-                        ? '#6200ee'
-                        : '#333',
-                    },
-                  ]}>
-                  <Text style={styles.dayText}>{day}</Text>
-                </Button>
-              ))}
-            </View>
-          </Card.Content>
-        </Card>
-      ))}
+      {loading ? ( // Show loading indicator if loading state is true
+        <ActivityIndicator
+          size="large"
+          color="#6200ee"
+          style={{flex: 1, justifyContent: 'center'}}
+        />
+      ) : (
+        <>
+          {schedules.map(schedule => (
+            <Card
+              key={schedule.id}
+              style={[styles.card, {opacity: schedule.active ? 1 : 0.5}]}>
+              <Card.Title
+                title={
+                  'At ' +
+                  schedule.time.hour +
+                  ':' +
+                  schedule.time.minute +
+                  ' - ' +
+                  schedule.quantity +
+                  ' QTY'
+                }
+                left={props => (
+                  <Icon {...props} name="schedule" size={24} color="#fff" />
+                )}
+                right={() => (
+                  <>
+                    <Switch
+                      value={schedule.active}
+                      onValueChange={() => toggleSwitch(schedule.id)}
+                      color="#6200ee"
+                    />
+                    <IconButton
+                      icon="trash-can-outline"
+                      iconColor={MD3Colors.error50}
+                      size={30}
+                      style={{alignSelf: 'flex-end'}}
+                      onPress={() => deleteSchedule(schedule.id)}
+                    />
+                  </>
+                )}
+              />
+              <Card.Content>
+                <View style={styles.daysContainer}>
+                  {days.map(day => (
+                    <Button
+                      key={day}
+                      style={[
+                        styles.dayButton,
+                        {
+                          backgroundColor: schedule.time.dayOfWeek.includes(
+                            isoWeekdays[day],
+                          )
+                            ? '#6200ee'
+                            : '#333',
+                        },
+                      ]}>
+                      <Text style={styles.dayText}>{day}</Text>
+                    </Button>
+                  ))}
+                </View>
+              </Card.Content>
+            </Card>
+          ))}
+        </>
+      )}
 
       <FAB
         style={styles.fab}
         icon="plus"
         color="#fff"
-        onPress={() => navigation.navigate('newSchedule')}
+        onPress={() =>
+          navigation.navigate('newSchedule', {refreshSchedules: fetchSchedules})
+        }
       />
     </SafeAreaView>
   );

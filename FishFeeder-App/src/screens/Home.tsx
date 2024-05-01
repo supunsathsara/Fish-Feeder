@@ -122,8 +122,9 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#1A1A1A',
-    width: '40%',
+    width: '30%',
     alignSelf: 'center',
+    alignItems:'center',
     marginBottom: 10,
   },
 });

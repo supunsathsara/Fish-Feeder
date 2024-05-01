@@ -1,18 +1,34 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Platform, ScrollView } from 'react-native';
-import { Text, Button, TextInput, FAB, Snackbar } from 'react-native-paper';
+import React, {useState} from 'react';
+import {
+  StyleSheet,
+  View,
+  Platform,
+  ScrollView,
+  Touchable,
+  Alert,
+} from 'react-native';
+import {
+  Text,
+  Button,
+  TextInput,
+  FAB,
+  Snackbar,
+  IconButton,
+} from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import axios from 'axios';
 
-const NewSchedule = ({navigation}: any) => {
-  const [time, setTime] = useState(new Date());
+const NewSchedule = ({navigation, route}: any) => {
+  const [time, setTime] = useState(new Date(new Date().setHours(12, 0, 0, 0)));
   const [qty, setQty] = useState('');
   const [activeDays, setActiveDays] = useState<string[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [visibleSnackbar, setVisibleSnackbar] = useState(false);
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const [loading, setLoading] = useState(false);
 
-  const handleTimeChange = (event:any, selectedTime:any) => {
+  const handleTimeChange = (event: any, selectedTime: any) => {
     setShowPicker(Platform.OS === 'ios');
     if (selectedTime) {
       setTime(selectedTime);
@@ -23,27 +39,73 @@ const NewSchedule = ({navigation}: any) => {
     setShowPicker(true);
   };
 
-  const toggleDay = (day:any) => {
+  const toggleDay = (day: any) => {
     setActiveDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day],
     );
   };
 
-  const handleSubmit = () => {
-    console.log('New schedule:', { time: time.toTimeString(), qty, activeDays });
-    setVisibleSnackbar(true);
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      // validate input
+      if (!qty || !activeDays.length) {
+        //show a message
+        Alert.alert('Please fill in all fields');
+        return;
+      }
 
-    navigation.navigate('Schedule');
+      console.log('New schedule:', {
+        time: time.toTimeString(),
+        qty,
+        activeDays,
+      });
+
+      // Send data to the backend
+      await axios.post('http://10.0.2.2:3000/schedules', {
+        time: time.toTimeString(),
+        qty,
+        activeDays,
+      });
+
+      setVisibleSnackbar(true);
+      route.params.refreshSchedules();
+
+      // Wait for 3 seconds before navigating to 'Schedule'
+      setTimeout(() => {
+        navigation.navigate('Schedule');
+      }, 3000);
+    } catch (error) {
+      console.error('Error creating new schedule:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onDismissSnackBar = () => setVisibleSnackbar(false);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>Create New Schedule</Text>
-        <Button icon="clock" mode="outlined" onPress={showTimepicker} style={styles.button}>
-          Pick Time: {time.getHours()}:{time.getMinutes().toString().padStart(2, '0')}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}>
+        <View style={styles.header}>
+          <IconButton
+            icon="arrow-left"
+            onPress={() => navigation.goBack()} // Use navigation.goBack() instead of navigation.navigate('Schedule')
+            style={styles.backButton}
+          />
+
+          <Text style={styles.title}>Create New Schedule</Text>
+        </View>
+        <Button
+          icon="clock"
+          mode="outlined"
+          onPress={showTimepicker}
+          disabled={loading}
+          style={styles.button}>
+          Pick Time: {time.getHours()}:
+          {time.getMinutes().toString().padStart(2, '0')}
         </Button>
         {showPicker && (
           <DateTimePicker
@@ -69,8 +131,7 @@ const NewSchedule = ({navigation}: any) => {
               key={day}
               mode={activeDays.includes(day) ? 'contained' : 'outlined'}
               onPress={() => toggleDay(day)}
-              style={styles.dayButton}
-            >
+              style={styles.dayButton}>
               {day}
             </Button>
           ))}
@@ -78,6 +139,7 @@ const NewSchedule = ({navigation}: any) => {
         <FAB
           style={styles.fab}
           icon="check"
+          loading={loading}
           onPress={handleSubmit}
         />
         <Snackbar
@@ -87,7 +149,7 @@ const NewSchedule = ({navigation}: any) => {
           action={{
             label: 'OK',
             onPress: () => {
-              // Handle user action
+              navigation.navigate('Schedule');
             },
           }}>
           Schedule created successfully!
@@ -115,6 +177,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     marginVertical: 20,
+    flex: 1,
   },
   input: {
     width: '90%',
@@ -148,6 +211,16 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0, // adjusted position to avoid overlap
     backgroundColor: '#6200ee',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 5,
   },
 });
 
