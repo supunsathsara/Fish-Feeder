@@ -8,6 +8,7 @@ const moment = require('moment-timezone');
 const serviceAccount = require('./nibm-iot-led-firebase-adminsdk-twm2g-1d6dac58db.json');
 const { sendFeedCommand } = require('./util/sendNodeMCU');
 
+
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: process.env.FIREBASE_DB_URL
@@ -110,85 +111,203 @@ app.get('/status', (req, res) => {
     });
 });
 
+app.get('/feeding-info', (req, res) => {
+    db.ref('/status').once('value', snapshot => {
+        const status = snapshot.val();
+        if (!status) {
+            return res.status(404).json({ error: 'Status information not found.' });
+        }
+
+        let nextFeedingTime = null;
+        let lastFeedingTime = null;
+
+        if (status.next_feeding) {
+            nextFeedingTime = moment(status.next_feeding).tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss');
+        }
+        if (status.last_feeding && status.last_feeding.timestamp) {
+            lastFeedingTime = moment(status.last_feeding.timestamp).tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss');
+        }
+
+        res.status(200).json({ nextFeedingTime, lastFeedingTime });
+    }).catch(error => {
+        res.status(500).json({ error: 'Error fetching feeding information: ' + error.message });
+    });
+});
+
+app.get('/schedules', (req, res) => {
+    db.ref('/schedules').once('value', snapshot => {
+        const schedules = [];
+        snapshot.forEach(childSnapshot => {
+            const schedule = childSnapshot.val();
+            schedule.id = childSnapshot.key;
+
+            // Convert UTC time to Sri Lanka time zone
+            const { hour, minute, dayOfWeek } = schedule.time;
+            const localTime = moment.tz({
+                year: new Date().getFullYear(),
+                month: new Date().getMonth(),
+                day: new Date().getDate(),
+                hour,
+                minute
+            }, 'UTC').tz('Asia/Colombo'); // Convert to Sri Lanka time zone
+            schedule.time = {
+                hour: localTime.hour(),
+                minute: localTime.minute(),
+                dayOfWeek
+            };
+
+            schedules.push(schedule);
+        });
+        res.status(200).json(schedules);
+    }).catch(error => {
+        res.status(500).json({ error: 'Error fetching schedules: ' + error.message });
+    });
+});
+
+
 app.post('/schedules', (req, res) => {
-    const { time, quantity } = req.body;
+    const { time, qty, activeDays } = req.body;
+
+    // Extract hour and minute from the time string
+    const [hours, minutes] = time.split(':').map(Number);
 
     // Convert local time (Sri Lanka Time) to UTC
     const localTime = moment.tz({
-        year: new Date().getFullYear(),
-        month: new Date().getMonth(),
-        day: new Date().getDate(),
-        hour: time.hour,
-        minute: time.minute
+        hour: hours,
+        minute: minutes
     }, 'Asia/Colombo'); // Sri Lanka timezone
 
     const utcTime = localTime.utc();
+    console.log('UTC Time:', utcTime.format('YYYY-MM-DD HH:mm:ss'));
+
+    // Mapping of days to ISO weekdays with correct adjustment for day shifts
+    const isoWeekdays = {
+        Sun: 7,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6,
+    };
+
+    // Adjust days based on UTC date
+    const dayOfWeekAdjustments = activeDays.map(day => {
+        const localDayISO = isoWeekdays[day];
+        const dayDifference = utcTime.day() - localTime.day();
+        let adjustedDayISO = localDayISO + dayDifference;
+
+        // Adjust if crossing week boundaries
+        if (adjustedDayISO < 1) {
+            adjustedDayISO += 7;
+        } else if (adjustedDayISO > 7) {
+            adjustedDayISO -= 7;
+        }
+
+        return adjustedDayISO;
+    });
 
     const timeToSave = {
         hour: utcTime.hour(),
         minute: utcTime.minute(),
-        dayOfWeek: time.dayOfWeek
+        dayOfWeek: dayOfWeekAdjustments
     };
 
     const newScheduleRef = db.ref('/schedules').push();
-    newScheduleRef.set({ time: timeToSave, quantity }, error => {
+    newScheduleRef.set({ time: timeToSave, quantity: qty, active: true }, error => {
         if (error) {
-            res.status(500).send('Error setting schedule: ' + error.message);
+            res.status(500).json({ error: 'Error setting schedule: ' + error.message });
         } else {
-            res.send(`Schedule created with ID: ${newScheduleRef.key}`);
+            const scheduleData = {
+                id: newScheduleRef.key,
+                time: timeToSave,
+                quantity: qty,
+                active: true
+            };
+            res.status(200).json(scheduleData);
         }
     });
 });
 
-app.put('/schedules/:id', (req, res) => {
-    const { time, quantity } = req.body;
-    db.ref(`/schedules/${req.params.id}`).update({ time, quantity }, error => {
+
+// Update schedule status
+app.put('/schedules/:id/status', (req, res) => {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    console.log('ID:', id, 'Active:', active);
+
+    const scheduleRef = db.ref(`/schedules/${id}`);
+    scheduleRef.update({ active: active }, error => {
         if (error) {
-            res.status(500).send('Error updating schedule: ' + error.message);
+            res.status(500).json({ error: 'Error updating schedule status: ' + error.message });
         } else {
-            res.send('Schedule updated');
+            res.status(200).json({ message: `Schedule status updated successfully for ID: ${id}` });
         }
     });
 });
 
+// Delete schedule
 app.delete('/schedules/:id', (req, res) => {
-    db.ref(`/schedules/${req.params.id}`).remove(error => {
+    const { id } = req.params;
+
+    const scheduleRef = db.ref(`/schedules/${id}`);
+    scheduleRef.remove(error => {
         if (error) {
-            res.status(500).send('Error removing schedule: ' + error.message);
+            res.status(500).json({ error: 'Error deleting schedule: ' + error.message });
         } else {
-            res.send('Schedule removed');
+            res.status(200).json({ message: `Schedule deleted successfully for ID: ${id}` });
         }
     });
 });
+
 
 app.get('/check-schedule', (req, res) => {
     const currentUtcTime = new Date(); // This time is in UTC
     const currentHour = currentUtcTime.getUTCHours();
     const currentMinute = currentUtcTime.getUTCMinutes();
-    const dayOfWeek = currentUtcTime.getUTCDay();
+    const dayOfWeekUTC = currentUtcTime.getUTCDay();
+    
+
+    // Convert UTC time to Sri Lanka time
+const currentSriLankaTime = moment.tz(currentUtcTime, 'Asia/Colombo');
+
+// Get the day of the week in Sri Lanka
+const dayOfWeekSriLanka = currentSriLankaTime.day();
+const dayOfWeek= currentSriLankaTime.day();
+
+
+    console.log("day ", dayOfWeekUTC)
+    console.log("daySl ", dayOfWeekSriLanka)
 
     db.ref('/schedules').once('value', snapshot => {
         const schedules = snapshot.val();
         let isScheduled = false;
+        let closestNextFeedingTime = null;
 
         Object.keys(schedules).forEach(key => {
             const schedule = schedules[key];
-            if (schedule.time.dayOfWeek.includes(dayOfWeek)) {
-                const scheduleHour = parseInt(schedule.time.hour, 10);
-                const scheduleMinute = parseInt(schedule.time.minute, 10);
+            console.log(schedule.time.dayOfWeek)
+            if (schedule.active && schedule.time.dayOfWeek.includes(dayOfWeek)) {
+               
+                const scheduleHour = schedule.time.hour;
+                const scheduleMinute = schedule.time.minute;
+                const scheduleDate = new Date(currentUtcTime);
+
+
+                scheduleDate.setUTCHours(scheduleHour, scheduleMinute, 0, 0);
+                //log the current UTC and scheduled time
+                console.log(scheduleDate)
 
                 // Check if current time is within 15 minutes of scheduled time
-                if (scheduleHour === currentHour && Math.abs(scheduleMinute - currentMinute) <= 15) {
+                if (scheduleHour === currentHour && Math.abs(scheduleMinute - currentMinute) <= 10) {
                     isScheduled = true;
-                    // Potentially send message to NodeMCU here
-                    //! TODO: Send message to NodeMCU
-                    sendFeedCommand();
+                    sendFeedCommand(); // Command to initiate feeding
 
-                    // Log the event
                     const feedingLog = {
                         timestamp: new Date().toISOString(),
                         event_type: 'Feeding',
-                        details: `Feeding started with quantity ${schedule.quantity}`,
+                        details: `Feeding started with quantity ${schedule.quantity}`
                     };
 
                     db.ref('/logs').push(feedingLog, error => {
@@ -202,14 +321,32 @@ app.get('/check-schedule', (req, res) => {
                     });
 
                 }
+
+                // Update the closest next feeding time
+                console.log("scheduleDate ", scheduleDate, "currentUtcTime ", currentUtcTime)
+                if (scheduleDate < currentUtcTime) {
+                    // If scheduled time is in the past for today, set it for the next weekr
+                    scheduleDate.setDate(scheduleDate.getDate() + 7);
+                }
+                
+                // Check and update the closest next feeding time
+                if (!closestNextFeedingTime || scheduleDate < closestNextFeedingTime) {
+                    closestNextFeedingTime = scheduleDate;
+                }
             }
         });
 
         if (isScheduled) {
             res.send('Feeding time!');
-            // Additional logic to handle feeding
         } else {
             res.send('No feeding scheduled for now.');
+        }
+
+        // Save next feeding time to status record
+        if (closestNextFeedingTime) {
+            db.ref('/status').update({
+                next_feeding: closestNextFeedingTime.toISOString()
+            });
         }
     });
 });
