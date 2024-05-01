@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Button, Text, Provider as PaperProvider, FAB, Card, Title, Snackbar } from 'react-native-paper';
+import { Button, Text, Provider as PaperProvider, FAB, Card, Title, Snackbar, TextInput } from 'react-native-paper';
 import LottieView from 'lottie-react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -11,6 +11,7 @@ const HomeScreen = () => {
   const onDismissSnackBar = () => setVisible(false);
 
   const [nextFeedTime, setNextFeedTime] = useState('12:00 PM');
+  const [qty, setQty] = useState('50');
 
   const handleFeedNow = () => {
     console.log('Feed now');
@@ -33,9 +34,16 @@ const HomeScreen = () => {
             <Text style={styles.info}>{nextFeedTime}</Text>
           </Card.Content>
         </Card>
+        <TextInput
+          label="QTY"
+          value={qty}
+          onChangeText={setQty}
+          style={styles.input}
+          keyboardType="numeric"
+        />
         <FAB
           variant='primary'
-          icon='food'
+          icon='fishbowl-outline'
           style={styles.button}
           color='#fff'
           label='Feed Now'
@@ -71,6 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 20,
   },
   title: {
     fontSize: 24,
@@ -84,15 +93,15 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 5,
     textAlign: 'center',
   },
   info: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#fff',
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: 'center',
   },
   button: {
@@ -101,13 +110,19 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '80%',
-    marginBottom: 20,
+    marginBottom: 10,
     backgroundColor: '#1A1A1A',
     alignItems: 'center',
     justifyContent: 'space-between',
     alignSelf: 'center',
   },
   icon: {
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  input: {
+    backgroundColor: '#1A1A1A',
+    width: '40%',
     alignSelf: 'center',
     marginBottom: 10,
   },

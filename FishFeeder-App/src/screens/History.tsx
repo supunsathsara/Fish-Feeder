@@ -7,7 +7,7 @@ import WeeklyChart from '../components/WeeklyChart'
 
 
 const History = () => {
-    const [value, setValue] = useState('');
+    const [value, setValue] = useState('week');
 
     return (
         <SafeAreaView style={styles.container}>
