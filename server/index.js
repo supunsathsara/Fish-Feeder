@@ -358,6 +358,87 @@ app.get('/logs', (req, res) => {
     });
 });
 
+
+app.get('/history', (req, res) => {
+    // Fetch the feeding events from the database
+    db.ref('/logs').once('value', snapshot => {
+        const logs = snapshot.val();
+        const weeklyCounts = {};
+        const monthlyCounts = {};
+
+        // Get the current date
+        const currentDate = new Date();
+        const currentWeekOfYear = getWeekOfYear(currentDate);
+        const currentMonth = getMonthName(currentDate.getMonth());
+        const currentYear = currentDate.getFullYear();
+
+        // Initialize weekly counts with zeros for all days of the week
+        const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        daysOfWeek.forEach(day => {
+            weeklyCounts[day] = 0;
+        });
+
+        // Initialize monthly counts with zeros for the last 7 months
+        const lastSevenMonths = getLastSevenMonths(currentDate);
+        lastSevenMonths.forEach(month => {
+            monthlyCounts[month] = 0;
+        });
+
+        // Iterate through each feeding event
+        Object.values(logs).forEach(log => {
+            const timestamp = new Date(log.timestamp);
+            const weekOfYear = getWeekOfYear(timestamp);
+            const dayOfWeek = getDayOfWeekName(timestamp.getDay());
+            const month = getMonthName(timestamp.getMonth());
+
+            // Increment the weekly count if the event falls within the ongoing week
+            if (weekOfYear === currentWeekOfYear) {
+                weeklyCounts[dayOfWeek]++;
+            }
+
+            // Increment the monthly count
+            const monthKey = `${timestamp.getFullYear()}-${month}`;
+            monthlyCounts[monthKey]++;
+        });
+
+        res.json({ weekly: weeklyCounts, monthly: monthlyCounts });
+    });
+});
+
+// Function to convert numeric day of week to day name (e.g., Sun, Mon)
+function getDayOfWeekName(dayOfWeek) {
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return daysOfWeek[dayOfWeek];
+}
+
+// Function to convert numeric month to month name (e.g., Jan, Feb)
+function getMonthName(month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month];
+}
+
+// Function to get the week of year
+function getWeekOfYear(date) {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+// Function to get the last seven months from the current date
+function getLastSevenMonths(currentDate) {
+    const lastSevenMonths = [];
+    for (let i = 0; i < 7; i++) {
+        const month = getMonthName(currentDate.getMonth());
+        const year = currentDate.getFullYear();
+        lastSevenMonths.unshift(`${year}-${month}`);
+        currentDate.setMonth(currentDate.getMonth() - 1);
+    }
+    return lastSevenMonths;
+}
+
+
+
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
