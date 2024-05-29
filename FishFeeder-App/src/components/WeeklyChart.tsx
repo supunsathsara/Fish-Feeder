@@ -1,26 +1,28 @@
 import React from 'react';
-import {StyleSheet, View} from 'react-native';
-import {BarChart} from 'react-native-gifted-charts';
+import { StyleSheet, View } from 'react-native';
+import { BarChart } from 'react-native-gifted-charts';
+import { WeeklyData } from '../types';
 
-const WeeklyChart = () => {
-  const barData = [
-    {value: 2, label: 'Mon', frontColor: '#4ABFF4'},
-    {value: 1, label: 'Tue', frontColor: '#79C3DB'},
-    {value: 5, label: 'Wed', frontColor: '#28B2B3'},
-    {value: 0, label: 'Thu', frontColor: '#4ADDBA'},
-    {value: 7, label: 'Fri', frontColor: '#91E3E3'},
-    {value: 6, label: 'Sat', frontColor: '#79C3DB'},
-    {value: 6, label: 'Sun', frontColor: '#4ABFF4'},
-  ];
+interface WeeklyChartProps {
+  data: WeeklyData;
+}
+
+const WeeklyChart: React.FC<WeeklyChartProps> = ({ data }) => {
+  const barData = Object.keys(data).map(day => ({
+    value: data[day as keyof WeeklyData],
+    label: day.slice(0, 3),
+    frontColor: '#4ABFF4',
+  }));
+
   return (
     <View>
       <BarChart
         showYAxisIndices
         horizontal
-        xAxisLabelTextStyle={{color: 'white', marginRight: 20}}
-        yAxisTextStyle={{color: 'white'}}
+        xAxisLabelTextStyle={{ color: 'white', marginRight: 20 }}
+        yAxisTextStyle={{ color: 'white' }}
         noOfSections={4}
-        maxValue={15}
+        maxValue={30}
         data={barData}
         isAnimated
         shiftX={40}

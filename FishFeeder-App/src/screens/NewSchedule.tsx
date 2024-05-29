@@ -62,7 +62,7 @@ const NewSchedule = ({navigation, route}: any) => {
       });
 
       // Send data to the backend
-      await axios.post('http://10.0.2.2:3000/schedules', {
+      await axios.post('https://fishfeeder-1-a4359990.deta.app/schedules', {
         time: time.toTimeString(),
         qty,
         activeDays,

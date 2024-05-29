@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   Card,
@@ -44,13 +44,15 @@ const Schedule = ({navigation}: any) => {
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     fetchSchedules();
   }, []);
 
   const fetchSchedules = async () => {
     try {
-      const response = await axios.get('http://10.0.2.2:3000/schedules');
+      const response = await axios.get(`https://fishfeeder-1-a4359990.deta.app/schedules`);
       setSchedules(response.data);
     } catch (error) {
       console.error('Error fetching schedules:', error);
@@ -71,7 +73,7 @@ const Schedule = ({navigation}: any) => {
       );
 
       // Send PUT request to update schedule status
-      await axios.put(`http://10.0.2.2:3000/schedules/${id}/status`, {
+      await axios.put(`https://fishfeeder-1-a4359990.deta.app/schedules/${id}/status`, {
         active: !schedules.find(schedule => schedule.id === id)?.active,
       });
     } catch (error) {
@@ -98,7 +100,7 @@ const Schedule = ({navigation}: any) => {
       setSchedules(schedules.filter(schedule => schedule.id !== id));
 
       // Then, send a request to delete schedule from backend
-      await axios.delete(`http://10.0.2.2:3000/schedules/${id}`);
+      await axios.delete(`https://fishfeeder-1-a4359990.deta.app/schedules/${id}`);
 
       // Handle success response if needed
       console.log(`Schedule deleted successfully for ID: ${id}`);
@@ -117,8 +119,14 @@ const Schedule = ({navigation}: any) => {
     }
   };
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchSchedules().then(() => setRefreshing(false));
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
+      
       {loading ? ( // Show loading indicator if loading state is true
         <ActivityIndicator
           size="large"
@@ -126,7 +134,10 @@ const Schedule = ({navigation}: any) => {
           style={{flex: 1, justifyContent: 'center'}}
         />
       ) : (
-        <>
+        <ScrollView
+        contentContainerStyle={styles.scrollViewContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
           {schedules.map(schedule => (
             <Card
               key={schedule.id}
@@ -183,7 +194,7 @@ const Schedule = ({navigation}: any) => {
               </Card.Content>
             </Card>
           ))}
-        </>
+         </ScrollView>
       )}
 
       <FAB
@@ -194,6 +205,7 @@ const Schedule = ({navigation}: any) => {
           navigation.navigate('newSchedule', {refreshSchedules: fetchSchedules})
         }
       />
+
     </SafeAreaView>
   );
 };
@@ -247,4 +259,7 @@ const styles = StyleSheet.create({
     bottom: 55,
     backgroundColor: '#6200ee',
   },
+  scrollViewContent: {
+    paddingBottom: 100, // Add sufficient padding to scroll above the navigator
+},
 });
