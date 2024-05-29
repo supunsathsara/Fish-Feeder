@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 require('dotenv').config()
 const admin = require('firebase-admin');
 const moment = require('moment-timezone');
+const cors = require('cors');
 
 // Initialize Firebase Admin SDK
 const serviceAccount = require('./nibm-iot-led-firebase-adminsdk-twm2g-1d6dac58db.json');
@@ -18,6 +19,14 @@ const db = admin.database();
 
 const app = express();
 app.use(bodyParser.json());
+
+const corsOptions = {
+    origin: '*',
+    credentials: true,
+    optionSuccessStatus: 200,
+  };
+
+app.use(cors(corsOptions));
 
 app.get('/', (req, res) => {
     db.ref('.info/connected').once('value', snapshot => {
@@ -66,8 +75,12 @@ app.post('/test-connection', (req, res) => {
 
 
 // Endpoints
-app.post('/feed', (req, res) => {
+app.post('/feed', async (req, res) => {
     const { quantity } = req.body;
+
+    //send feed command to NodeMCU
+    await sendFeedCommand(quantity);
+
 
     const feedingLog = {
         timestamp: new Date().toISOString(),
@@ -75,7 +88,7 @@ app.post('/feed', (req, res) => {
         details: `Feeding started with quantity ${quantity}`,
     };
 
-    db.ref('/logs').push(feedingLog, error => {
+   db.ref('/logs').push(feedingLog, error => {
         if (error) {
             res.status(500).send('Error logging feeding event: ' + error.message);
         } else {
@@ -85,7 +98,30 @@ app.post('/feed', (req, res) => {
             res.send('Feeding started and logged');
         }
     });
+    
+
+   // res.json({ message: 'Feeding started and logged', feedingLog });
 });
+
+app.get('/update-log/:qty', async (req,res) => {
+    const { qty } = req.params;
+    const feedingLog = {
+        timestamp: new Date().toISOString(),
+        event_type: 'Feeding',
+        details: `Feeding started with quantity ${qty}`,
+    };
+
+    db.ref('/logs').push(feedingLog, error => {
+        if (error) {
+            res.status(500).send('Error logging feeding event: ' + error.message);
+        } else {
+            db.ref('/status').update({
+                last_feeding: { timestamp: new Date().toISOString(), quantity: qty }
+            });
+            res.send('Feeding started and logged');
+        }
+    });
+})
 
 app.get('/status', (req, res) => {
     db.ref('/status').once('value', snapshot => {
@@ -98,6 +134,7 @@ app.get('/status', (req, res) => {
         // Prepare different formatted time strings
         const formattedTimeStandard = sriLankaTime.format('YYYY-MM-DD HH:mm:ss'); // "2024-04-23 23:42:07"
         const formattedTime12Hour = sriLankaTime.format('YYYY-MM-DD hh:mm:ss A'); // "2024-04-23 11:42:07 PM"
+        const formattedTimeForApp = sriLankaTime.format('MM-DD HH:mm'); // "04-23 23:42"
 
         // Include these formatted times in the response
         res.json({
@@ -105,7 +142,8 @@ app.get('/status', (req, res) => {
                 quantity: status.last_feeding.quantity,
                 timestamp: utcTime,
                 formattedTimeStandard: formattedTimeStandard,
-                formattedTime12Hour: formattedTime12Hour
+                formattedTime12Hour: formattedTime12Hour,
+                formattedTimeForApp: formattedTimeForApp
             }
         });
     });
@@ -280,7 +318,7 @@ const dayOfWeek= currentSriLankaTime.day();
     console.log("day ", dayOfWeekUTC)
     console.log("daySl ", dayOfWeekSriLanka)
 
-    db.ref('/schedules').once('value', snapshot => {
+    db.ref('/schedules').once('value', async snapshot => {
         const schedules = snapshot.val();
         let isScheduled = false;
         let closestNextFeedingTime = null;
@@ -300,9 +338,9 @@ const dayOfWeek= currentSriLankaTime.day();
                 console.log(scheduleDate)
 
                 // Check if current time is within 15 minutes of scheduled time
-                if (scheduleHour === currentHour && Math.abs(scheduleMinute - currentMinute) <= 10) {
+                if (scheduleHour === currentHour && Math.abs(scheduleMinute - currentMinute) <= 5) {
                     isScheduled = true;
-                    sendFeedCommand(); // Command to initiate feeding
+                    sendFeedCommand(schedule.quantity); // Command to initiate feeding
 
                     const feedingLog = {
                         timestamp: new Date().toISOString(),
